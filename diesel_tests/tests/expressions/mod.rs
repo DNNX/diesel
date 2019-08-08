@@ -454,3 +454,17 @@ fn test_arrays_b() {
 
     assert_eq!(value, vec![7, 14]);
 }
+
+#[test]
+fn test_operator_precedence() {
+    use self::numbers::columns::*;
+    use self::numbers::table as numbers;
+
+    let connection = connection();
+    connection
+        .execute("INSERT INTO numbers (n) VALUES (2)")
+        .unwrap();
+    let source = numbers.select((n.gt(0)).eq(true));
+
+    assert_eq!(Ok(true), source.first(&connection));
+}
