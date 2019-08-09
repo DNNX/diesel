@@ -90,7 +90,7 @@ macro_rules! __diesel_operator_body {
                 __diesel_operator_to_sql!(
                     notation = $notation,
                     operator_expr = out.push_sql($operator),
-                    field_exprs = ($(self.$field_name.walk_ast(out.reborrow())?),+),
+                    field_exprs = (out.push_sql("("), $(self.$field_name.walk_ast(out.reborrow())?),+, out.push_sql(")")),
                 );
                 Ok(())
             }
@@ -104,17 +104,19 @@ macro_rules! __diesel_operator_to_sql {
     (
         notation = infix,
         operator_expr = $op:expr,
-        field_exprs = ($left:expr, $right:expr),
+        field_exprs = ($a:expr, $left:expr, $right:expr, $z:expr),
     ) => {
+        $a;
         $left;
         $op;
         $right;
+        $z;
     };
 
     (
         notation = postfix,
         operator_expr = $op:expr,
-        field_exprs = ($expr:expr),
+        field_exprs = ($a:expr, $expr:expr, $z:expr),
     ) => {
         $expr;
         $op;
@@ -123,10 +125,12 @@ macro_rules! __diesel_operator_to_sql {
     (
         notation = prefix,
         operator_expr = $op:expr,
-        field_exprs = ($expr:expr),
+        field_exprs = ($a:expr, $expr:expr, $z:expr),
     ) => {
+        $a;
         $op;
         $expr;
+        $z;
     };
 }
 
