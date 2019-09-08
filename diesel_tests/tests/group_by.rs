@@ -11,7 +11,7 @@ fn group_by_generates_group_by_sql() {
         .select(users::id)
         .filter(users::hair_color.is_null());
     let mut expected_sql = "SELECT `users`.`id` FROM `users` \
-                            WHERE `users`.`hair_color` IS NULL \
+                            WHERE (`users`.`hair_color` IS NULL) \
                             GROUP BY `users`.`name` \
                             -- binds: []"
         .to_string();
@@ -36,7 +36,7 @@ fn boxed_queries_have_group_by_method() {
         .select(users::id)
         .filter(users::hair_color.is_null());
     let mut expected_sql = "SELECT `users`.`id` FROM `users` \
-                            WHERE `users`.`hair_color` IS NULL \
+                            WHERE (`users`.`hair_color` IS NULL) \
                             GROUP BY `users`.`name` \
                             -- binds: []"
         .to_string();

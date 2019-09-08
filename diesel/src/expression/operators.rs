@@ -124,11 +124,10 @@ macro_rules! __diesel_operator_to_sql {
         left_paren_expr = $left_paren:expr,
         right_paren_expr = $right_paren:expr,
     ) => {
-        // TODO: fix asc desc
-        // $left_paren;
+        $left_paren;
         $expr;
         $op;
-        // $right_paren;
+        $right_paren;
     };
 
     (
@@ -375,8 +374,6 @@ macro_rules! diesel_prefix_operator {
 }
 
 infix_operator!(And, " AND ");
-// TODO: fix between
-// infix_operator!(Between, " BETWEEN ");
 infix_operator!(Escape, " ESCAPE ");
 infix_operator!(Eq, " = ");
 infix_operator!(Gt, " > ");
@@ -384,17 +381,12 @@ infix_operator!(GtEq, " >= ");
 infix_operator!(Like, " LIKE ");
 infix_operator!(Lt, " < ");
 infix_operator!(LtEq, " <= ");
-// TODO: fix not between
-// infix_operator!(NotBetween, " NOT BETWEEN ");
 infix_operator!(NotEq, " != ");
 infix_operator!(NotLike, " NOT LIKE ");
 infix_operator!(Or, " OR ");
 
 postfix_operator!(IsNull, " IS NULL");
 postfix_operator!(IsNotNull, " IS NOT NULL");
-// TODO: make as and desc not expressions?
-postfix_operator!(Asc, " ASC", ());
-postfix_operator!(Desc, " DESC", ());
 
 prefix_operator!(Not, "NOT ");
 
@@ -551,6 +543,74 @@ where
         out.push_sql(" AND ");
         self.right.walk_ast(out.reborrow())?;
         out.push_sql(")");
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
+#[doc(hidden)]
+pub struct Asc<T> {
+    pub(crate) value: T,
+}
+
+impl<T> Asc<T> {
+    pub fn new(value: T) -> Self {
+        Self { value }
+    }
+}
+
+impl<T, ST> ::expression::Expression for Asc<T>
+where
+    T: ::expression::Expression<SqlType = ST>
+{
+    type SqlType = ST;
+}
+
+// TODO: This looks bad, it should appear only in ORDER BY and simimar.
+impl_selectable_expression!(Asc<T>);
+
+impl<T, DB> ::query_builder::QueryFragment<DB> for Asc<T>
+where
+    T: ::query_builder::QueryFragment<DB>,
+    DB: ::backend::Backend,
+{
+    fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
+        self.value.walk_ast(out.reborrow())?;
+        out.push_sql(" ASC");
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
+#[doc(hidden)]
+pub struct Desc<T> {
+    pub(crate) value: T,
+}
+
+impl<T> Desc<T> {
+    pub fn new(value: T) -> Self {
+        Self { value }
+    }
+}
+
+impl<T, ST> ::expression::Expression for Desc<T>
+where
+    T: ::expression::Expression<SqlType = ST>
+{
+    type SqlType = ST;
+}
+
+// TODO: This looks bad, it should appear only in ORDER BY and simimar.
+impl_selectable_expression!(Desc<T>);
+
+impl<T, DB> ::query_builder::QueryFragment<DB> for Desc<T>
+where
+    T: ::query_builder::QueryFragment<DB>,
+    DB: ::backend::Backend,
+{
+    fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
+        self.value.walk_ast(out.reborrow())?;
+        out.push_sql(" DESC");
         Ok(())
     }
 }
