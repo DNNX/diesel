@@ -91,6 +91,8 @@ macro_rules! __diesel_operator_body {
                     notation = $notation,
                     operator_expr = out.push_sql($operator),
                     field_exprs = ($(self.$field_name.walk_ast(out.reborrow())?),+),
+                    left_paren_expr = out.push_sql("("),
+                    right_paren_expr = out.push_sql(")"),
                 );
                 Ok(())
             }
@@ -105,28 +107,41 @@ macro_rules! __diesel_operator_to_sql {
         notation = infix,
         operator_expr = $op:expr,
         field_exprs = ($left:expr, $right:expr),
+        left_paren_expr = $left_paren:expr,
+        right_paren_expr = $right_paren:expr,
     ) => {
+        $left_paren;
         $left;
         $op;
         $right;
+        $right_paren;
     };
 
     (
         notation = postfix,
         operator_expr = $op:expr,
         field_exprs = ($expr:expr),
+        left_paren_expr = $left_paren:expr,
+        right_paren_expr = $right_paren:expr,
     ) => {
+        // TODO: fix asc desc
+        // $left_paren;
         $expr;
         $op;
+        // $right_paren;
     };
 
     (
         notation = prefix,
         operator_expr = $op:expr,
         field_exprs = ($expr:expr),
+        left_paren_expr = $left_paren:expr,
+        right_paren_expr = $right_paren:expr,
     ) => {
+        $left_paren;
         $op;
         $expr;
+        $right_paren;
     };
 }
 
@@ -360,7 +375,8 @@ macro_rules! diesel_prefix_operator {
 }
 
 infix_operator!(And, " AND ");
-infix_operator!(Between, " BETWEEN ");
+// TODO: fix between
+// infix_operator!(Between, " BETWEEN ");
 infix_operator!(Escape, " ESCAPE ");
 infix_operator!(Eq, " = ");
 infix_operator!(Gt, " > ");
@@ -368,13 +384,15 @@ infix_operator!(GtEq, " >= ");
 infix_operator!(Like, " LIKE ");
 infix_operator!(Lt, " < ");
 infix_operator!(LtEq, " <= ");
-infix_operator!(NotBetween, " NOT BETWEEN ");
+// TODO: fix not between
+// infix_operator!(NotBetween, " NOT BETWEEN ");
 infix_operator!(NotEq, " != ");
 infix_operator!(NotLike, " NOT LIKE ");
 infix_operator!(Or, " OR ");
 
 postfix_operator!(IsNull, " IS NULL");
 postfix_operator!(IsNotNull, " IS NOT NULL");
+// TODO: make as and desc not expressions?
 postfix_operator!(Asc, " ASC", ());
 postfix_operator!(Desc, " DESC", ());
 
@@ -407,6 +425,7 @@ where
     }
 }
 
+// TODO: delete Concat business
 #[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
 #[doc(hidden)]
 pub struct Concat<L, R> {
@@ -442,6 +461,94 @@ where
         out.push_sql("(");
         self.left.walk_ast(out.reborrow())?;
         out.push_sql(" || ");
+        self.right.walk_ast(out.reborrow())?;
+        out.push_sql(")");
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
+#[doc(hidden)]
+pub struct Between<V, L, R> {
+    pub(crate) value: V,
+    pub(crate) left: L,
+    pub(crate) right: R,
+}
+
+impl<V, L, R> Between<V, L, R> {
+    pub fn new(value: V, left: L, right: R) -> Self {
+        Self { value, left, right }
+    }
+}
+
+impl<V, L, R, ST> ::expression::Expression for Between<V, L, R>
+where
+    V: ::expression::Expression<SqlType = ST>,
+    L: ::expression::Expression<SqlType = ST>,
+    R: ::expression::Expression<SqlType = ST>,
+{
+    type SqlType = crate::sql_types::Bool;
+}
+
+impl_selectable_expression!(Between<V, L, R>);
+
+impl<V, L, R, DB> ::query_builder::QueryFragment<DB> for Between<V, L, R>
+where
+    V: ::query_builder::QueryFragment<DB>,
+    L: ::query_builder::QueryFragment<DB>,
+    R: ::query_builder::QueryFragment<DB>,
+    DB: ::backend::Backend,
+{
+    fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
+        out.push_sql("(");
+        self.value.walk_ast(out.reborrow())?;
+        out.push_sql(" BETWEEN ");
+        self.left.walk_ast(out.reborrow())?;
+        out.push_sql(" AND ");
+        self.right.walk_ast(out.reborrow())?;
+        out.push_sql(")");
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
+#[doc(hidden)]
+pub struct NotBetween<V, L, R> {
+    pub(crate) value: V,
+    pub(crate) left: L,
+    pub(crate) right: R,
+}
+
+impl<V, L, R> NotBetween<V, L, R> {
+    pub fn new(value: V, left: L, right: R) -> Self {
+        Self { value, left, right }
+    }
+}
+
+impl<V, L, R, ST> ::expression::Expression for NotBetween<V, L, R>
+where
+    V: ::expression::Expression<SqlType = ST>,
+    L: ::expression::Expression<SqlType = ST>,
+    R: ::expression::Expression<SqlType = ST>,
+{
+    type SqlType = crate::sql_types::Bool;
+}
+
+impl_selectable_expression!(NotBetween<V, L, R>);
+
+impl<V, L, R, DB> ::query_builder::QueryFragment<DB> for NotBetween<V, L, R>
+where
+    V: ::query_builder::QueryFragment<DB>,
+    L: ::query_builder::QueryFragment<DB>,
+    R: ::query_builder::QueryFragment<DB>,
+    DB: ::backend::Backend,
+{
+    fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
+        out.push_sql("(");
+        self.value.walk_ast(out.reborrow())?;
+        out.push_sql(" NOT BETWEEN ");
+        self.left.walk_ast(out.reborrow())?;
+        out.push_sql(" AND ");
         self.right.walk_ast(out.reborrow())?;
         out.push_sql(")");
         Ok(())

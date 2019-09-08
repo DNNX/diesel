@@ -294,12 +294,12 @@ pub trait ExpressionMethods: Expression + Sized {
     /// assert_eq!(Ok("dog".to_string()), data);
     /// # }
     /// ```
-    fn between<T, U>(self, lower: T, upper: U) -> Between<Self, And<T::Expression, U::Expression>>
+    fn between<T, U>(self, lower: T, upper: U) -> Between<Self, T::Expression, U::Expression>
     where
         T: AsExpression<Self::SqlType>,
         U: AsExpression<Self::SqlType>,
     {
-        Between::new(self, And::new(lower.as_expression(), upper.as_expression()))
+        Between::new(self, lower.as_expression(), upper.as_expression())
     }
 
     /// Creates a SQL `NOT BETWEEN` expression using the given lower and upper
@@ -330,12 +330,12 @@ pub trait ExpressionMethods: Expression + Sized {
         self,
         lower: T,
         upper: U,
-    ) -> NotBetween<Self, And<T::Expression, U::Expression>>
+    ) -> NotBetween<Self, T::Expression, U::Expression>
     where
         T: AsExpression<Self::SqlType>,
         U: AsExpression<Self::SqlType>,
     {
-        NotBetween::new(self, And::new(lower.as_expression(), upper.as_expression()))
+        NotBetween::new(self, lower.as_expression(), upper.as_expression())
     }
 
     /// Creates a SQL `DESC` expression, representing this expression in

@@ -20,12 +20,12 @@ fn test_debug_output() {
     if cfg!(feature = "postgres") {
         assert_eq!(
             sql,
-            r#"UPDATE "users" SET "name" = $1 WHERE "users"."id" = $2 -- binds: ["new_name", 1]"#
+            r#"UPDATE "users" SET "name" = $1 WHERE ("users"."id" = $2) -- binds: ["new_name", 1]"#
         )
     } else {
         assert_eq!(
             sql,
-            r#"UPDATE `users` SET `name` = ? WHERE `users`.`id` = ? -- binds: ["new_name", 1]"#
+            r#"UPDATE `users` SET `name` = ? WHERE (`users`.`id` = ?) -- binds: ["new_name", 1]"#
         )
     }
 }
