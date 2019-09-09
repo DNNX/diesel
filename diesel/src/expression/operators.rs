@@ -373,6 +373,7 @@ macro_rules! diesel_prefix_operator {
     }
 }
 
+infix_operator!(Concat, " || ", ReturnBasedOnArgs);
 infix_operator!(And, " AND ");
 infix_operator!(Escape, " ESCAPE ");
 infix_operator!(Eq, " = ");
@@ -414,48 +415,6 @@ where
 
     fn values(self) -> Self::Values {
         Eq::new(self.left, &self.right).values()
-    }
-}
-
-// TODO: delete Concat business
-#[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
-#[doc(hidden)]
-pub struct Concat<L, R> {
-    pub(crate) left: L,
-    pub(crate) right: R,
-}
-
-impl<L, R> Concat<L, R> {
-    pub fn new(left: L, right: R) -> Self {
-        Self { left, right }
-    }
-}
-
-impl<L, R, ST> ::expression::Expression for Concat<L, R>
-where
-    L: ::expression::Expression<SqlType = ST>,
-    R: ::expression::Expression<SqlType = ST>,
-{
-    type SqlType = ST;
-}
-
-impl_selectable_expression!(Concat<L, R>);
-
-impl<L, R, DB> ::query_builder::QueryFragment<DB> for Concat<L, R>
-where
-    L: ::query_builder::QueryFragment<DB>,
-    R: ::query_builder::QueryFragment<DB>,
-    DB: ::backend::Backend,
-{
-    fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
-        // Those brackets are required because mysql is broken
-        // https://github.com/diesel-rs/diesel/issues/2133#issuecomment-517432317
-        out.push_sql("(");
-        self.left.walk_ast(out.reborrow())?;
-        out.push_sql(" || ");
-        self.right.walk_ast(out.reborrow())?;
-        out.push_sql(")");
-        Ok(())
     }
 }
 
