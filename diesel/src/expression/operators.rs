@@ -375,7 +375,6 @@ macro_rules! diesel_prefix_operator {
 
 infix_operator!(Concat, " || ", ReturnBasedOnArgs);
 infix_operator!(And, " AND ");
-infix_operator!(Escape, " ESCAPE ");
 infix_operator!(Eq, " = ");
 infix_operator!(Gt, " > ");
 infix_operator!(GtEq, " >= ");
@@ -568,6 +567,49 @@ where
     fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
         self.value.walk_ast(out.reborrow())?;
         out.push_sql(" DESC");
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
+#[doc(hidden)]
+pub struct Escape<L, R> {
+    pub(crate) left: L,
+    pub(crate) right: R,
+}
+
+impl<L, R> Escape<L, R> {
+    pub fn new(left: L, right: R) -> Self {
+        Self { left, right }
+    }
+}
+
+impl<L, R, E, ST> ::expression::Expression for Escape<Like<L, R>, E>
+where
+    L: ::expression::Expression<SqlType = ST>,
+    R: ::expression::Expression<SqlType = ST>,
+    E: ::expression::Expression<SqlType = crate::sql_types::VarChar>,
+{
+    type SqlType = crate::sql_types::Bool;
+}
+
+impl_selectable_expression!(Escape<L, R>);
+
+impl<L, R, E, DB> ::query_builder::QueryFragment<DB> for Escape<Like<L, R>, E>
+where
+    L: ::query_builder::QueryFragment<DB>,
+    R: ::query_builder::QueryFragment<DB>,
+    E: ::query_builder::QueryFragment<DB>,
+    DB: ::backend::Backend,
+{
+    fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
+        out.push_sql("(");
+        self.left.left.walk_ast(out.reborrow())?;
+        out.push_sql(" LIKE ");
+        self.left.right.walk_ast(out.reborrow())?;
+        out.push_sql(" ESCAPE ");
+        self.right.walk_ast(out.reborrow())?;
+        out.push_sql(")");
         Ok(())
     }
 }
