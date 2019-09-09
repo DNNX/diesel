@@ -505,43 +505,42 @@ where
 
 #[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
 #[doc(hidden)]
-pub struct NotBetween<V, L, R> {
-    pub(crate) value: V,
+pub struct NotBetween<L, R> {
     pub(crate) left: L,
     pub(crate) right: R,
 }
 
-impl<V, L, R> NotBetween<V, L, R> {
-    pub fn new(value: V, left: L, right: R) -> Self {
-        Self { value, left, right }
+impl<L, R> NotBetween<L, R> {
+    pub fn new(left: L, right: R) -> Self {
+        Self { left, right }
     }
 }
 
-impl<V, L, R, ST> ::expression::Expression for NotBetween<V, L, R>
+impl<V, L, U, ST> ::expression::Expression for NotBetween<V, And<L, U>>
 where
     V: ::expression::Expression<SqlType = ST>,
     L: ::expression::Expression<SqlType = ST>,
-    R: ::expression::Expression<SqlType = ST>,
+    U: ::expression::Expression<SqlType = ST>,
 {
     type SqlType = crate::sql_types::Bool;
 }
 
-impl_selectable_expression!(NotBetween<V, L, R>);
+impl_selectable_expression!(NotBetween<L, R>);
 
-impl<V, L, R, DB> ::query_builder::QueryFragment<DB> for NotBetween<V, L, R>
+impl<V, L, U, DB> ::query_builder::QueryFragment<DB> for NotBetween<V, And<L, U>>
 where
     V: ::query_builder::QueryFragment<DB>,
     L: ::query_builder::QueryFragment<DB>,
-    R: ::query_builder::QueryFragment<DB>,
+    U: ::query_builder::QueryFragment<DB>,
     DB: ::backend::Backend,
 {
     fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
         out.push_sql("(");
-        self.value.walk_ast(out.reborrow())?;
-        out.push_sql(" NOT BETWEEN ");
         self.left.walk_ast(out.reborrow())?;
+        out.push_sql(" NOT BETWEEN ");
+        self.right.left.walk_ast(out.reborrow())?;
         out.push_sql(" AND ");
-        self.right.walk_ast(out.reborrow())?;
+        self.right.right.walk_ast(out.reborrow())?;
         out.push_sql(")");
         Ok(())
     }

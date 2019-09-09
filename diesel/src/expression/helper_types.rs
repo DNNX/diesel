@@ -63,7 +63,8 @@ pub type Between<Lhs, Lower, Upper> =
 /// The return type of
 /// [`lhs.not_between(lower, upper)`](../expression_methods/trait.ExpressionMethods.html#method.not_between)
 pub type NotBetween<Lhs, Lower, Upper> = super::operators::NotBetween<
-    Lhs, AsExpr<Lower, Lhs>, AsExpr<Upper, Lhs>,
+    Lhs,
+    super::operators::And<AsExpr<Lower, Lhs>, AsExpr<Upper, Lhs>>,
 >;
 
 /// The return type of

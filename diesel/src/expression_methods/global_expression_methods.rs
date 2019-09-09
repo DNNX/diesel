@@ -330,12 +330,12 @@ pub trait ExpressionMethods: Expression + Sized {
         self,
         lower: T,
         upper: U,
-    ) -> NotBetween<Self, T::Expression, U::Expression>
+    ) -> NotBetween<Self, And<T::Expression, U::Expression>>
     where
         T: AsExpression<Self::SqlType>,
         U: AsExpression<Self::SqlType>,
     {
-        NotBetween::new(self, lower.as_expression(), upper.as_expression())
+        NotBetween::new(self, And::new(lower.as_expression(), upper.as_expression()))
     }
 
     /// Creates a SQL `DESC` expression, representing this expression in
