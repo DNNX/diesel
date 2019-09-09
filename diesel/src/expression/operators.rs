@@ -91,6 +91,8 @@ macro_rules! __diesel_operator_body {
                     notation = $notation,
                     operator_expr = out.push_sql($operator),
                     field_exprs = ($(self.$field_name.walk_ast(out.reborrow())?),+),
+                    left_paren_expr = out.push_sql("("),
+                    right_paren_expr = out.push_sql(")"),
                 );
                 Ok(())
             }
@@ -105,28 +107,40 @@ macro_rules! __diesel_operator_to_sql {
         notation = infix,
         operator_expr = $op:expr,
         field_exprs = ($left:expr, $right:expr),
+        left_paren_expr = $left_paren:expr,
+        right_paren_expr = $right_paren:expr,
     ) => {
+        $left_paren;
         $left;
         $op;
         $right;
+        $right_paren;
     };
 
     (
         notation = postfix,
         operator_expr = $op:expr,
         field_exprs = ($expr:expr),
+        left_paren_expr = $left_paren:expr,
+        right_paren_expr = $right_paren:expr,
     ) => {
+        $left_paren;
         $expr;
         $op;
+        $right_paren;
     };
 
     (
         notation = prefix,
         operator_expr = $op:expr,
         field_exprs = ($expr:expr),
+        left_paren_expr = $left_paren:expr,
+        right_paren_expr = $right_paren:expr,
     ) => {
+        $left_paren;
         $op;
         $expr;
+        $right_paren;
     };
 }
 
@@ -359,24 +373,20 @@ macro_rules! diesel_prefix_operator {
     }
 }
 
+infix_operator!(Concat, " || ", ReturnBasedOnArgs);
 infix_operator!(And, " AND ");
-infix_operator!(Between, " BETWEEN ");
-infix_operator!(Escape, " ESCAPE ");
 infix_operator!(Eq, " = ");
 infix_operator!(Gt, " > ");
 infix_operator!(GtEq, " >= ");
 infix_operator!(Like, " LIKE ");
 infix_operator!(Lt, " < ");
 infix_operator!(LtEq, " <= ");
-infix_operator!(NotBetween, " NOT BETWEEN ");
 infix_operator!(NotEq, " != ");
 infix_operator!(NotLike, " NOT LIKE ");
 infix_operator!(Or, " OR ");
 
 postfix_operator!(IsNull, " IS NULL");
 postfix_operator!(IsNotNull, " IS NOT NULL");
-postfix_operator!(Asc, " ASC", ());
-postfix_operator!(Desc, " DESC", ());
 
 prefix_operator!(Not, "NOT ");
 
@@ -409,39 +419,224 @@ where
 
 #[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
 #[doc(hidden)]
-pub struct Concat<L, R> {
+pub struct Between<L, R> {
     pub(crate) left: L,
     pub(crate) right: R,
 }
 
-impl<L, R> Concat<L, R> {
+impl<L, R> Between<L, R> {
     pub fn new(left: L, right: R) -> Self {
         Self { left, right }
     }
 }
 
-impl<L, R, ST> ::expression::Expression for Concat<L, R>
+impl<V, L, U, ST> ::expression::Expression for Between<V, And<L, U>>
 where
+    V: ::expression::Expression<SqlType = ST>,
     L: ::expression::Expression<SqlType = ST>,
-    R: ::expression::Expression<SqlType = ST>,
+    U: ::expression::Expression<SqlType = ST>,
+{
+    type SqlType = crate::sql_types::Bool;
+}
+
+impl_selectable_expression!(Between<L, R>);
+
+impl<V, L, U, DB> ::query_builder::QueryFragment<DB> for Between<V, And<L, U>>
+where
+    V: ::query_builder::QueryFragment<DB>,
+    L: ::query_builder::QueryFragment<DB>,
+    U: ::query_builder::QueryFragment<DB>,
+    DB: ::backend::Backend,
+{
+    fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
+        out.push_sql("(");
+        self.left.walk_ast(out.reborrow())?;
+        out.push_sql(" BETWEEN ");
+        self.right.left.walk_ast(out.reborrow())?;
+        out.push_sql(" AND ");
+        self.right.right.walk_ast(out.reborrow())?;
+        out.push_sql(")");
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
+#[doc(hidden)]
+pub struct NotBetween<L, R> {
+    pub(crate) left: L,
+    pub(crate) right: R,
+}
+
+impl<L, R> NotBetween<L, R> {
+    pub fn new(left: L, right: R) -> Self {
+        Self { left, right }
+    }
+}
+
+impl<V, L, U, ST> ::expression::Expression for NotBetween<V, And<L, U>>
+where
+    V: ::expression::Expression<SqlType = ST>,
+    L: ::expression::Expression<SqlType = ST>,
+    U: ::expression::Expression<SqlType = ST>,
+{
+    type SqlType = crate::sql_types::Bool;
+}
+
+impl_selectable_expression!(NotBetween<L, R>);
+
+impl<V, L, U, DB> ::query_builder::QueryFragment<DB> for NotBetween<V, And<L, U>>
+where
+    V: ::query_builder::QueryFragment<DB>,
+    L: ::query_builder::QueryFragment<DB>,
+    U: ::query_builder::QueryFragment<DB>,
+    DB: ::backend::Backend,
+{
+    fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
+        out.push_sql("(");
+        self.left.walk_ast(out.reborrow())?;
+        out.push_sql(" NOT BETWEEN ");
+        self.right.left.walk_ast(out.reborrow())?;
+        out.push_sql(" AND ");
+        self.right.right.walk_ast(out.reborrow())?;
+        out.push_sql(")");
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
+#[doc(hidden)]
+pub struct Asc<T> {
+    pub(crate) value: T,
+}
+
+impl<T> Asc<T> {
+    pub fn new(value: T) -> Self {
+        Self { value }
+    }
+}
+
+impl<T, ST> ::expression::Expression for Asc<T>
+where
+    T: ::expression::Expression<SqlType = ST>
 {
     type SqlType = ST;
 }
 
-impl_selectable_expression!(Concat<L, R>);
+// TODO: This looks bad, it should appear only in ORDER BY and simimar.
+impl_selectable_expression!(Asc<T>);
 
-impl<L, R, DB> ::query_builder::QueryFragment<DB> for Concat<L, R>
+impl<T, DB> ::query_builder::QueryFragment<DB> for Asc<T>
 where
-    L: ::query_builder::QueryFragment<DB>,
-    R: ::query_builder::QueryFragment<DB>,
+    T: ::query_builder::QueryFragment<DB>,
     DB: ::backend::Backend,
 {
     fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
-        // Those brackets are required because mysql is broken
-        // https://github.com/diesel-rs/diesel/issues/2133#issuecomment-517432317
+        self.value.walk_ast(out.reborrow())?;
+        out.push_sql(" ASC");
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
+#[doc(hidden)]
+pub struct Desc<T> {
+    pub(crate) value: T,
+}
+
+impl<T> Desc<T> {
+    pub fn new(value: T) -> Self {
+        Self { value }
+    }
+}
+
+impl<T, ST> ::expression::Expression for Desc<T>
+where
+    T: ::expression::Expression<SqlType = ST>
+{
+    type SqlType = ST;
+}
+
+// TODO: This looks bad, it should appear only in ORDER BY and simimar.
+impl_selectable_expression!(Desc<T>);
+
+impl<T, DB> ::query_builder::QueryFragment<DB> for Desc<T>
+where
+    T: ::query_builder::QueryFragment<DB>,
+    DB: ::backend::Backend,
+{
+    fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
+        self.value.walk_ast(out.reborrow())?;
+        out.push_sql(" DESC");
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, QueryId, DieselNumericOps, NonAggregate)]
+#[doc(hidden)]
+pub struct Escape<L, R> {
+    pub(crate) left: L,
+    pub(crate) right: R,
+}
+
+impl<L, R> Escape<L, R> {
+    pub fn new(left: L, right: R) -> Self {
+        Self { left, right }
+    }
+}
+
+impl<L, R, E, ST> ::expression::Expression for Escape<Like<L, R>, E>
+where
+    L: ::expression::Expression<SqlType = ST>,
+    R: ::expression::Expression<SqlType = ST>,
+    E: ::expression::Expression<SqlType = crate::sql_types::VarChar>,
+{
+    type SqlType = crate::sql_types::Bool;
+}
+
+impl<L, R, E, ST> ::expression::Expression for Escape<NotLike<L, R>, E>
+where
+    L: ::expression::Expression<SqlType = ST>,
+    R: ::expression::Expression<SqlType = ST>,
+    E: ::expression::Expression<SqlType = crate::sql_types::VarChar>,
+{
+    type SqlType = crate::sql_types::Bool;
+}
+
+
+impl_selectable_expression!(Escape<L, R>);
+
+impl<L, R, E, DB> ::query_builder::QueryFragment<DB> for Escape<Like<L, R>, E>
+where
+    L: ::query_builder::QueryFragment<DB>,
+    R: ::query_builder::QueryFragment<DB>,
+    E: ::query_builder::QueryFragment<DB>,
+    DB: ::backend::Backend,
+{
+    fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
         out.push_sql("(");
-        self.left.walk_ast(out.reborrow())?;
-        out.push_sql(" || ");
+        self.left.left.walk_ast(out.reborrow())?;
+        out.push_sql(" LIKE ");
+        self.left.right.walk_ast(out.reborrow())?;
+        out.push_sql(" ESCAPE ");
+        self.right.walk_ast(out.reborrow())?;
+        out.push_sql(")");
+        Ok(())
+    }
+}
+
+impl<L, R, E, DB> ::query_builder::QueryFragment<DB> for Escape<NotLike<L, R>, E>
+where
+    L: ::query_builder::QueryFragment<DB>,
+    R: ::query_builder::QueryFragment<DB>,
+    E: ::query_builder::QueryFragment<DB>,
+    DB: ::backend::Backend,
+{
+    fn walk_ast(&self, mut out: ::query_builder::AstPass<DB>) -> ::result::QueryResult<()> {
+        out.push_sql("(");
+        self.left.left.walk_ast(out.reborrow())?;
+        out.push_sql(" NOT LIKE ");
+        self.left.right.walk_ast(out.reborrow())?;
+        out.push_sql(" ESCAPE ");
         self.right.walk_ast(out.reborrow())?;
         out.push_sql(")");
         Ok(())
