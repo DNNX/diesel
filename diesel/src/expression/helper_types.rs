@@ -58,7 +58,7 @@ pub type LtEq<Lhs, Rhs> = super::operators::LtEq<Lhs, AsExpr<Rhs, Lhs>>;
 /// The return type of
 /// [`lhs.between(lower, upper)`](../expression_methods/trait.ExpressionMethods.html#method.between)
 pub type Between<Lhs, Lower, Upper> =
-    super::operators::Between<Lhs, AsExpr<Lower, Lhs>, AsExpr<Upper, Lhs>>;
+    super::operators::Between<Lhs, super::operators::And<AsExpr<Lower, Lhs>, AsExpr<Upper, Lhs>>>;
 
 /// The return type of
 /// [`lhs.not_between(lower, upper)`](../expression_methods/trait.ExpressionMethods.html#method.not_between)
